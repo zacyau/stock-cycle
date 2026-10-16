@@ -261,7 +261,7 @@
           p.value[1].toFixed(2) + '%</b>';
       }),
       title: {
-        text: '当前距历史前高\n' + dd.current_drawdown_pct.toFixed(2) + '%',
+        text: '当前距前高\n' + dd.current_drawdown_pct.toFixed(2) + '%',
         top: 30,
         right: isMobile() ? 10 : 18,
         textAlign: 'right',
