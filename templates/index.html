@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="hero-main">
+      <h1>{{ title }}</h1>
+      <div class="hero-sub">
+        {% if payload %}
+          <span class="badge">{{ payload.meta.name }}</span>
+          <span>{{ payload.meta.code }}</span>
+          <span class="sep">·</span>
+          <span>{{ payload.meta.first_date }} ~ {{ payload.meta.last_date }}</span>
+          <span class="sep">·</span>
+          <span>{{ payload.meta.bar_count }} 个交易日</span>
+          <span class="sep">·</span>
+          <span>{{ payload.meta.source }}</span>
+          {% if payload.meta.from_cache %}<span class="badge soft">本地缓存</span>{% endif %}
+        {% else %}
+          <span>无法获取数据</span>
+        {% endif %}
+      </div>
+    </div>
+    <form class="search" action="/" method="get">
+      <input id="code-input" name="code" value="{{ code_display }}" autocomplete="off"
+             spellcheck="false" inputmode="text" placeholder="输入代码，如 510500 / 000905 / 159915">
+      <button class="btn primary" type="submit">查询</button>
+      <button class="btn ghost" type="button" id="btn-refresh" title="清除本地缓存并重新抓取">刷新数据</button>
+    </form>
+  </header>
+
+  <nav class="presets">
+    {% for c, n in presets %}
+      <a class="chip{% if c == code %} active{% endif %}" href="/?code={{ c }}">{{ n }}<em>{{ c[2:] }}</em></a>
+    {% endfor %}
+  </nav>
+
+  {% if error %}
+    <div class="alert">
+      <strong>数据获取失败</strong>
+      <p>{{ error }}</p>
+      <p class="dim">请确认代码为 6 位 A股 / ETF / 指数代码，或稍后重试（腾讯接口偶发限流）。</p>
+    </div>
+  {% else %}
+
+    {% for w in payload.meta.warnings %}
+      <div class="alert warn">{{ w }}</div>
+    {% endfor %}
+
+    <section class="overview" id="overview"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><i class="num">①</i>对数坐标视角下的长期年化收益</h2>
+        <span class="hint">纵轴对数刻度 · 等比例涨幅在视觉上等距</span>
+      </div>
+      <div class="chart chart-lg" id="chart-nav"></div>
+      <div class="metric-strip" id="nav-metrics"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><i class="num">②</i>历史最大回撤幅度及时长</h2>
+        <span class="hint">回撤 = 净值相对历史最高净值的跌幅</span>
+      </div>
+      <div class="chart chart-md" id="chart-dd"></div>
+      <div class="metric-strip" id="dd-metrics"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><i class="num">③</i>牛熊阶段的划分</h2>
+        <div class="controls">
+          <div class="seg" id="seg-freq" data-value="{{ default_frequency }}">
+            <button type="button" data-v="month" class="active">月线</button>
+            <button type="button" data-v="day">日线</button>
+          </div>
+          <div class="seg" id="seg-th" data-value="{{ default_threshold }}">
+            {% for t in thresholds %}
+              <button type="button" data-v="{{ t }}"{% if t == default_threshold %} class="active"{% endif %}>±{{ t }}%</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="stat-row" id="swing-stats"></div>
+      <div class="chart chart-md" id="chart-swing"></div>
+      <div class="band-title">阶段时长分布<span class="dim">（宽度按月份数等比）</span></div>
+      <div class="phase-band" id="phase-band"></div>
+      <div class="legend-row" id="swing-legend"></div>
+      <p class="foot-note">
+        摆动法口径：自峰值回落超过设定阈值即确认进入熊市，前一段牛市在峰值处结束；自谷底反弹超过阈值即确认进入牛市，
+        前一段熊市在谷底处结束。末段若尚未被反向摆动确认，按自身涨跌方向归类并以半透明色带表示。
+      </p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2><i class="num">④</i>不同时间尺度下的涨跌统计</h2>
+        <label class="since-picker">
+          <span>自定义基准日</span>
+          <input type="date" id="since-date" value="{{ since or (payload.since_default or '') }}">
+        </label>
+      </div>
+      <div class="period-grid" id="period-grid"></div>
+      <p class="foot-note">
+        全部统计基于后复权收盘价，基准为「不晚于该日期的最后一个交易日」。涨跌幅按 A 股习惯以红色表示上涨、绿色表示下跌。
+      </p>
+    </section>
+
+  {% endif %}
+
+  <footer class="footer">
+    <span>数据来源：腾讯行情（后复权）· 数据仅供参考，不构成投资建议</span>
+    <span>FastAPI + ECharts · 本机缓存于 data/cache.db</span>
+  </footer>
+</div>
+
+<script src="/static/js/echarts.min.js"></script>
+{% if payload %}
+<script>window.__DATA__ = {{ payload | tojson }};</script>
+{% else %}
+<script>window.__DATA__ = null;</script>
+{% endif %}
+<script src="/static/js/app.js"></script>
+</body>
+</html>

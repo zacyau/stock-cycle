@@ -1,0 +1,19 @@
+# Python 编译产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 本地数据缓存（由程序自动抓取重建，不纳入版本管理）
+data/cache.db
+data/cache.db-shm
+data/cache.db-wal
+
+# 虚拟环境与本地配置
+.venv/
+venv/
+.env
+
+# 操作系统 / 编辑器
+.DS_Store
+*.swp
