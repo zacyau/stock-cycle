@@ -254,7 +254,7 @@
 
     ch.setOption({
       animationDuration: 600,
-      grid: baseGrid({ top: 24, bottom: 28 }),
+      grid: baseGrid({ top: 24, bottom: 28, right: isMobile() ? 62 : 88 }),
       tooltip: tooltipBase(function (ps) {
         var p = ps[0];
         return '<b>' + p.axisValueLabel + '</b><br/>距前高　<b style="color:' + C.dd + '">' +
@@ -290,13 +290,15 @@
           color: '#2f6d4b',
           fontSize: 12,
           fontWeight: 600,
+          lineHeight: 15,
+          align: 'center',
           backgroundColor: 'rgba(255,255,255,.94)',
           borderColor: '#cfe6d8',
           borderWidth: 1,
           borderRadius: 5,
           padding: [3, 7],
           formatter: function (p) {
-            return '当前水位 ' + p.value[1].toFixed(2) + '%';
+            return '当前水位\n' + p.value[1].toFixed(2) + '%';
           }
         },
         markLine: {
