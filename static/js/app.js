@@ -511,11 +511,19 @@
 
   /* ------------------------------------------------------------ ④ 多尺度 */
   function renderPeriods() {
+    var firstDate = D.dates[0];
     $('period-grid').innerHTML = D.periods.map(function (p) {
       var cls = p.available ? dirClass(p.pct) : 'flat';
       var val = p.available ? pctStr(p.pct) : '—';
+      var label = p.label;
+      // 自成立以来卡片：基准为上市首日后显示「自成立以来」，自定义日期时显示「自X日以来」
+      if (p.key === 'since') {
+        label = (p.base_date && p.base_date === firstDate)
+          ? '自成立以来'
+          : ('自' + (p.base_date || '') + '以来');
+      }
       return '<div class="pcard ' + cls + '">' +
-        '<div class="pl">' + esc(p.label) + '</div>' +
+        '<div class="pl">' + esc(label) + '</div>' +
         '<div class="pv">' + esc(val) + '</div>' +
         '<div class="pn">' + esc(p.note || '') + '</div></div>';
     }).join('');

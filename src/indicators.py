@@ -265,16 +265,21 @@ def period_returns(close: pd.Series, cards: List[dict]) -> List[Dict]:
 
         elif kind == "since":
             raw_date = card.get("date") or card.get("default")
-            try:
-                target = dt.date.fromisoformat(str(raw_date))
-            except (TypeError, ValueError):
-                out.append(unavailable(card, "日期无效"))
-                continue
-            if target < first_date or target > asof:
-                out.append(unavailable(card, "日期超出区间"))
-                continue
-            base_idx = _base_index(close, target)
-            note = f"基准 {close.index[base_idx].date().isoformat()}"
+            if not raw_date:
+                # 未指定基准日 → 自上市首日（成立以来）
+                base_idx = 0
+                note = "上市首日"
+            else:
+                try:
+                    target = dt.date.fromisoformat(str(raw_date))
+                except (TypeError, ValueError):
+                    out.append(unavailable(card, "日期无效"))
+                    continue
+                if target < first_date or target > asof:
+                    out.append(unavailable(card, "日期超出区间"))
+                    continue
+                base_idx = _base_index(close, target)
+                note = f"基准 {close.index[base_idx].date().isoformat()}"
 
         if base_idx is None:
             continue

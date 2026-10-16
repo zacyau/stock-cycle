@@ -58,7 +58,7 @@ PERIOD_CARDS = [
     {"key": "ytd",    "label": "年初至今",          "kind": "ytd"},
     {"key": "ath",    "label": "距离前高",          "kind": "ath"},
     {"key": "y1",     "label": "1年",              "kind": "window", "days": 365},
-    {"key": "since",  "label": "自定义基准日以来",   "kind": "since",  "default": "2024-09-24"},
+    {"key": "since",  "label": "自成立以来",          "kind": "since",  "default": ""},
     {"key": "y3",     "label": "3年",              "kind": "window", "days": 1095},
     {"key": "y5",     "label": "5年",              "kind": "window", "days": 1825},
 ]
