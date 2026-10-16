@@ -298,7 +298,7 @@
           borderRadius: 5,
           padding: [3, 7],
           formatter: function (p) {
-            return '当前水位\n' + p.value[1].toFixed(2) + '%';
+            return '当前距历史前高\n' + p.value[1].toFixed(2) + '%';
           }
         },
         markLine: {
@@ -369,7 +369,7 @@
         v: dd.duration_months.toFixed(1) + ' 个月' + (dd.recovered ? '' : '（进行中）'),
         cls: 'dim'
       },
-      { k: '当前水位', v: pctStr(dd.current_drawdown_pct), cls: dirClass(dd.current_drawdown_pct) }
+      { k: '当前距历史前高', v: pctStr(dd.current_drawdown_pct), cls: dirClass(dd.current_drawdown_pct) }
     ];
     $('dd-metrics').innerHTML = m.map(function (it) {
       return '<div class="m"><div class="mk">' + esc(it.k) + '</div>' +
