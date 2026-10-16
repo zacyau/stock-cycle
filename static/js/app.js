@@ -260,6 +260,18 @@
         return '<b>' + p.axisValueLabel + '</b><br/>距前高　<b style="color:' + C.dd + '">' +
           p.value[1].toFixed(2) + '%</b>';
       }),
+      title: {
+        text: '当前距历史前高\n' + dd.current_drawdown_pct.toFixed(2) + '%',
+        top: 30,
+        right: isMobile() ? 10 : 18,
+        textAlign: 'right',
+        textStyle: { color: '#2f6d4b', fontSize: 12, fontWeight: 600, lineHeight: 16 },
+        backgroundColor: 'rgba(255,255,255,.92)',
+        borderColor: '#cfe6d8',
+        borderWidth: 1,
+        borderRadius: 5,
+        padding: [3, 7]
+      },
       xAxis: timeAxis(),
       yAxis: {
         type: 'value',
@@ -284,22 +296,6 @@
             { offset: 0, color: C.ddFill[0] },
             { offset: 1, color: C.ddFill[1] }
           ])
-        },
-        endLabel: {
-          show: true,
-          color: '#2f6d4b',
-          fontSize: 12,
-          fontWeight: 600,
-          lineHeight: 15,
-          align: 'center',
-          backgroundColor: 'rgba(255,255,255,.94)',
-          borderColor: '#cfe6d8',
-          borderWidth: 1,
-          borderRadius: 5,
-          padding: [3, 7],
-          formatter: function (p) {
-            return '当前距历史前高\n' + p.value[1].toFixed(2) + '%';
-          }
         },
         markLine: {
           silent: true,
