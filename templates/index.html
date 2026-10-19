@@ -18,9 +18,9 @@
           <span class="badge">{{ payload.meta.name }}</span>
           <span>{{ payload.meta.code }}</span>
           <span class="sep">·</span>
-          <span>{{ payload.meta.first_date }} ~ {{ payload.meta.last_date }}</span>
+          <span id="meta-range">{{ payload.meta.first_date }} ~ {{ payload.meta.last_date }}</span>
           <span class="sep">·</span>
-          <span>{{ payload.meta.bar_count }} 个交易日</span>
+          <span id="meta-bars">{{ payload.meta.bar_count }} 个交易日</span>
           <span class="sep">·</span>
           <span>{{ payload.meta.source }}</span>
           {% if payload.meta.from_cache %}<span class="badge soft">本地缓存</span>{% endif %}
@@ -56,6 +56,16 @@
     {% endfor %}
 
     <section class="overview" id="overview"></section>
+
+    <div class="range-bar">
+      <span class="range-label">时间范围</span>
+      <div class="seg" id="seg-range" data-value="{{ default_range }}">
+        {% for key, label in view_ranges %}
+          <button type="button" data-v="{{ key }}"{% if key == default_range %} class="active"{% endif %}>{{ label }}</button>
+        {% endfor %}
+      </div>
+      <span class="range-tip" id="range-tip"></span>
+    </div>
 
     <section class="card">
       <div class="card-head">

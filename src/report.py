@@ -64,6 +64,7 @@ def get_payload(
     code_raw: str = DEFAULT_CODE,
     refresh: bool = False,
     since: Optional[str] = None,
+    range_key: str = "all",
     logger: Optional[Callable[[str], None]] = None,
 ) -> Dict:
     code = resolve_code(code_raw)
@@ -72,6 +73,7 @@ def get_payload(
     if not bars:
         raise FetchError(f"{code} 没有可用数据")
 
+    # 全量数据（D）：前三个图表默认以此为基础，第④个多尺度涨跌卡也基于它
     payload = indicators.build_payload(bars, SWING_THRESHOLDS, since)
     payload["meta"] = {
         "code": code,
@@ -85,4 +87,14 @@ def get_payload(
         "source": "腾讯行情（后复权）",
         "thresholds": SWING_THRESHOLDS,
     }
+
+    # 时间范围视角：对前三个图表做窗口切片重算；第④个涨跌卡保持全量不变
+    win = indicators.filter_bars_by_range(bars, range_key)
+    if win is not bars and len(win) >= 2:
+        view = indicators.build_payload(win, SWING_THRESHOLDS, since, compute_periods=False)
+        payload["view"] = view
+        payload["view_range"] = range_key
+    else:
+        payload["view"] = None
+        payload["view_range"] = "all"
     return payload

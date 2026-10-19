@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from config import PERIOD_CARDS
+from config import PERIOD_CARDS, VIEW_RANGE_YEARS
 
 
 # ------------------------------------------------------------------ 基础工具
@@ -25,6 +25,22 @@ def to_frame(bars: List[dict]) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     df = df.drop_duplicates(subset=["date"]).set_index("date").sort_index()
     return df[["open", "close", "high", "low", "volume"]].astype(float)
+
+
+def filter_bars_by_range(bars: List[dict], range_key: str) -> List[dict]:
+    """按时间范围截取窗口（相对最后交易日往前 N 年）。
+
+    'all' 或非法值返回原始 bars；窗口不足 2 根时返回原始 bars（避免图表失真）。
+    """
+    if not range_key or range_key == "all" or range_key not in VIEW_RANGE_YEARS:
+        return bars
+    if len(bars) < 2:
+        return bars
+    years = VIEW_RANGE_YEARS[range_key]
+    last = dt.date.fromisoformat(bars[-1]["date"])
+    start = last - dt.timedelta(days=int(round(years * 365.25)))
+    win = [b for b in bars if dt.date.fromisoformat(b["date"]) >= start]
+    return win if len(win) >= 2 else bars
 
 
 def months_between(d1: str, d2: str) -> int:
@@ -302,8 +318,17 @@ def period_returns(close: pd.Series, cards: List[dict]) -> List[Dict]:
 
 
 # ------------------------------------------------------------------ 汇总
-def build_payload(bars: List[dict], thresholds: List[int], custom_since: Optional[str] = None) -> Dict:
-    """把原始日线加工成模板所需的全部数据。"""
+def build_payload(
+    bars: List[dict],
+    thresholds: List[int],
+    custom_since: Optional[str] = None,
+    compute_periods: bool = True,
+) -> Dict:
+    """把原始日线加工成模板所需的全部数据。
+
+    compute_periods=False 时跳过第④个多尺度涨跌卡的计算（该卡始终基于全量数据，
+    窗口视图无需重复计算）。
+    """
     df = to_frame(bars)
     close = df["close"]
     nav = build_nav(close)
@@ -334,14 +359,19 @@ def build_payload(bars: List[dict], thresholds: List[int], custom_since: Optiona
                 "stats": swing_stats(phases, len(pts)),
             }
 
-    cards = []
-    for c in PERIOD_CARDS:
-        item = dict(c)
-        if c["kind"] == "since" and custom_since:
-            item["date"] = custom_since
-        cards.append(item)
+    since_default: Optional[str] = None
+    periods: List[Dict] = []
+    if compute_periods:
+        cards = []
+        for c in PERIOD_CARDS:
+            item = dict(c)
+            if c["kind"] == "since" and custom_since:
+                item["date"] = custom_since
+            cards.append(item)
 
-    since_card = next((c for c in cards if c["kind"] == "since"), None)
+        since_card = next((c for c in cards if c["kind"] == "since"), None)
+        since_default = (since_card or {}).get("date") or (since_card or {}).get("default")
+        periods = period_returns(close, cards)
 
     return {
         "dates": dates,
@@ -351,7 +381,9 @@ def build_payload(bars: List[dict], thresholds: List[int], custom_since: Optiona
         "drawdown": dd,
         "cagr": compute_cagr(nav),
         "swings": swings,
-        "periods": period_returns(close, cards),
-        "since_default": (since_card or {}).get("date") or (since_card or {}).get("default"),
+        "periods": periods,
+        "since_default": since_default,
         "bar_count": len(nav),
+        "first_date": dates[0] if dates else "",
+        "last_date": dates[-1] if dates else "",
     }

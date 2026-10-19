@@ -20,9 +20,11 @@ from config import (
     CODE_PRESETS,
     DEFAULT_CODE,
     DEFAULT_FREQUENCY,
+    DEFAULT_RANGE,
     DEFAULT_THRESHOLD,
     FREQUENCIES,
     SWING_THRESHOLDS,
+    VIEW_RANGES,
 )
 from src import cache
 from src.fetcher import FetchError, resolve_code
@@ -48,7 +50,7 @@ def _bare_code(code: str) -> str:
     return code[2:] if code[:2] in ("sh", "sz") and len(code) >= 8 else code
 
 
-def _render(request: Request, code: str, refresh: bool, since: str | None):
+def _render(request: Request, code: str, refresh: bool, since: str | None, default_range: str = DEFAULT_RANGE):
     display_code = code
     payload = None
     error = None
@@ -73,6 +75,8 @@ def _render(request: Request, code: str, refresh: bool, since: str | None):
             "frequencies": FREQUENCIES,
             "default_frequency": DEFAULT_FREQUENCY,
             "default_threshold": DEFAULT_THRESHOLD,
+            "default_range": default_range,
+            "view_ranges": VIEW_RANGES,
             "since": since or "",
             "title": (
                 f"{_short_code(display_code)}（对数）走势、回撤与牛熊周期"
@@ -89,17 +93,18 @@ def index(
     code: str = Query(DEFAULT_CODE),
     refresh: int = Query(0, description="1 表示强制刷新数据"),
     since: str | None = Query(None, description="自定义基准日 YYYY-MM-DD"),
+    range: str = Query(DEFAULT_RANGE, description="时间范围视角 all/5y/3y/1y"),
 ):
-    return _render(request, code, bool(refresh), since)
+    return _render(request, code, bool(refresh), since, range)
 
 
 @app.post("/api/refresh")
-def api_refresh(code: str = Query(DEFAULT_CODE)):
+def api_refresh(code: str = Query(DEFAULT_CODE), range: str = Query(DEFAULT_RANGE)):
     """强制清缓存并重新抓取，返回最新元信息。"""
     try:
         normalized = resolve_code(code)
         cache.clear(normalized)
-        payload = get_payload(normalized, refresh=True, logger=logger.info)
+        payload = get_payload(normalized, refresh=True, range_key=range, logger=logger.info)
         return JSONResponse({"ok": True, "meta": payload["meta"]})
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)
@@ -109,10 +114,11 @@ def api_refresh(code: str = Query(DEFAULT_CODE)):
 def api_data(
     code: str = Query(DEFAULT_CODE),
     since: str | None = Query(None),
+    range: str = Query(DEFAULT_RANGE),
 ):
     """纯 JSON 接口，便于外部程序调用。"""
     try:
-        payload = get_payload(code, refresh=False, since=since, logger=logger.info)
+        payload = get_payload(code, refresh=False, since=since, range_key=range, logger=logger.info)
         return JSONResponse(payload)
     except Exception as exc:  # noqa: BLE001
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=502)

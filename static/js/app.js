@@ -21,6 +21,12 @@
   };
 
   var charts = [];
+  var chartNav = null;
+  var chartDd = null;
+  // 时间范围视图：窗口化数据（仅影响前三个图表）。null 表示「成立以来」（用全量 D）
+  var V = (D && D.view) || null;
+  function VD() { return V || D; }
+
   function regChart(dom) {
     var c = echarts.init(dom, null, { renderer: 'canvas' });
     charts.push(c);
@@ -144,7 +150,7 @@
 
   /* ------------------------------------------------------------ 概览条 */
   function renderOverview() {
-    var c = D.cagr, dd = D.drawdown;
+    var c = VD().cagr, dd = VD().drawdown;
     var items = [
       { k: '期末净值倍数', v: xStr(c.total_multiple), cls: 'nav' },
       { k: '长期年化收益 (CAGR)', v: pctStr(c.cagr_pct), cls: dirClass(c.cagr_pct) },
@@ -161,10 +167,11 @@
 
   /* ------------------------------------------------------------ ① 对数净值 */
   function renderNav() {
-    var ch = regChart($('chart-nav'));
-    var scale = logScale(D.nav);
-    var data = D.dates.map(function (d, i) { return [d, Math.log10(D.nav[i])]; });
-    var cagr = D.cagr.cagr_pct;
+    var v = VD();
+    var ch = chartNav || (chartNav = regChart($('chart-nav')));
+    var scale = logScale(v.nav);
+    var data = v.dates.map(function (d, i) { return [d, Math.log10(v.nav[i])]; });
+    var cagr = v.cagr.cagr_pct;
 
     ch.setOption({
       animationDuration: 600,
@@ -214,9 +221,9 @@
             color: C.text,
             fontSize: 13,
             fontWeight: 700,
-            formatter: function () { return xStr(D.cagr.total_multiple); }
+            formatter: function () { return xStr(v.cagr.total_multiple); }
           },
-          data: [{ coord: [D.dates[D.dates.length - 1], Math.log10(D.nav[D.nav.length - 1])] }]
+          data: [{ coord: [v.dates[v.dates.length - 1], Math.log10(v.nav[v.nav.length - 1])] }]
         },
         markLine: {
           silent: true,
@@ -226,16 +233,16 @@
           data: [{ yAxis: 0 }]
         }
       }]
-    });
+    }, true);
     ch.resize();
 
     var m = [
-      { k: '起始日期', v: D.cagr.start_date, cls: 'dim' },
+      { k: '起始日期', v: v.cagr.start_date, cls: 'dim' },
       { k: '起始净值', v: '1.00x', cls: 'nav' },
-      { k: '期末净值', v: xStr(D.cagr.total_multiple), cls: 'nav' },
-      { k: '区间累计收益', v: pctStr(D.cagr.total_return_pct), cls: dirClass(D.cagr.total_return_pct) },
-      { k: '长期年化 (CAGR)', v: pctStr(D.cagr.cagr_pct), cls: dirClass(D.cagr.cagr_pct) },
-      { k: '统计跨度', v: '约 ' + D.cagr.years.toFixed(1) + ' 年', cls: 'dim' }
+      { k: '期末净值', v: xStr(v.cagr.total_multiple), cls: 'nav' },
+      { k: '区间累计收益', v: pctStr(v.cagr.total_return_pct), cls: dirClass(v.cagr.total_return_pct) },
+      { k: '长期年化 (CAGR)', v: pctStr(v.cagr.cagr_pct), cls: dirClass(v.cagr.cagr_pct) },
+      { k: '统计跨度', v: '约 ' + v.cagr.years.toFixed(1) + ' 年', cls: 'dim' }
     ];
     $('nav-metrics').innerHTML = m.map(function (it) {
       return '<div class="m"><div class="mk">' + esc(it.k) + '</div>' +
@@ -245,9 +252,10 @@
 
   /* ------------------------------------------------------------ ② 回撤 */
   function renderDrawdown() {
-    var ch = regChart($('chart-dd'));
-    var dd = D.drawdown;
-    var data = D.dates.map(function (d, i) { return [d, dd.series[i]]; });
+    var v = VD();
+    var ch = chartDd || (chartDd = regChart($('chart-dd')));
+    var dd = v.drawdown;
+    var data = v.dates.map(function (d, i) { return [d, dd.series[i]]; });
     var span = Math.abs(dd.max_drawdown_pct);
     var iv = span > 45 ? 10 : (span > 22 ? 5 : 2);
     var lo = Math.floor(dd.max_drawdown_pct / iv) * iv;
@@ -338,7 +346,7 @@
               }
             },
             {
-              coord: [D.dates[D.dates.length - 1], dd.current_drawdown_pct],
+              coord: [v.dates[v.dates.length - 1], dd.current_drawdown_pct],
               symbol: 'emptyCircle',
               symbolSize: 8,
               itemStyle: { color: '#fff', borderColor: C.dd, borderWidth: 2 },
@@ -347,7 +355,7 @@
           ]
         }
       }]
-    });
+    }, true);
     ch.resize();
 
     var m = [
@@ -378,15 +386,16 @@
 
   function currentSwing() {
     var key = swing.freq + '_' + swing.th;
-    return D.swings[key] || D.swings[Object.keys(D.swings)[0]];
+    return VD().swings[key] || VD().swings[Object.keys(VD().swings)[0]];
   }
 
   function renderSwing() {
+    var v = VD();
     var sw = currentSwing();
     var s = sw.stats;
     var useMonth = sw.freq === 'month';
-    var dates = useMonth ? D.m_dates : D.dates;
-    var navs = useMonth ? D.m_nav : D.nav;
+    var dates = useMonth ? v.m_dates : v.dates;
+    var navs = useMonth ? v.m_nav : v.nav;
 
     /* --- 统计卡片 --- */
     $('swing-stats').innerHTML = [
@@ -586,6 +595,74 @@
     });
   }
 
+  /* ------------------------------------------------------------ 时间范围视角 */
+  function updateHeaderRange() {
+    var v = VD();
+    var r = $('meta-range'), b = $('meta-bars');
+    if (r) r.textContent = v.first_date + ' ~ ' + v.last_date;
+    if (b) b.textContent = v.bar_count + ' 个交易日';
+  }
+  function setRangeTip(t, loading) {
+    var tip = $('range-tip');
+    if (!tip) return;
+    tip.textContent = t || '';
+    tip.classList.toggle('loading', !!loading);
+  }
+  function updateView() {
+    renderOverview();
+    renderNav();
+    renderDrawdown();
+    renderSwing();
+    updateHeaderRange();
+  }
+  function applyRange(range) {
+    if (range === 'all') {
+      V = null;
+      setRangeTip('');
+      updateView();
+      return;
+    }
+    var bar = $('seg-range');
+    if (bar) bar.classList.add('loading');
+    setRangeTip('加载中…', true);
+    fetch('/api/data?code=' + encodeURIComponent(D.meta.code) + '&range=' + range)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (bar) bar.classList.remove('loading');
+        if (!j || j.ok === false) {
+          setRangeTip(j && j.error ? ('加载失败：' + j.error) : '加载失败');
+          V = null;
+          updateView();
+          return;
+        }
+        V = j.view || null;
+        var v = VD();
+        setRangeTip(V ? ('区间 ' + v.first_date + ' ~ ' + v.last_date) : '');
+        updateView();
+      })
+      .catch(function (e) {
+        if (bar) bar.classList.remove('loading');
+        setRangeTip('加载失败：' + e.message);
+        V = null;
+        updateView();
+      });
+  }
+  function bindRange() {
+    var box = $('seg-range');
+    if (!box) return;
+    box.addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('button') : null;
+      if (!btn) return;
+      var range = btn.dataset.v;
+      if (range === box.dataset.value) return;
+      Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      box.dataset.value = range;
+      applyRange(range);
+    });
+  }
+
   /* ------------------------------------------------------------ 启动 */
   renderOverview();
   renderNav();
@@ -596,4 +673,9 @@
   bindRefresh();
   bindSeg('seg-freq', function (v) { swing.freq = v; renderSwing(); });
   bindSeg('seg-th', function (v) { swing.th = parseInt(v, 10); renderSwing(); });
+  bindRange();
+  updateHeaderRange();
+  if (V) {
+    setRangeTip('区间 ' + V.first_date + ' ~ ' + V.last_date);
+  }
 })();

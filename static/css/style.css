@@ -254,6 +254,23 @@ html, body {
   box-shadow: 0 1px 3px rgba(23,43,77,.1);
 }
 
+/* -------------------------------------------------- 时间范围视角栏 */
+.range-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 14px 0 2px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #fbfcfe, #f6f9fc);
+  border: 1px solid #e7edf3;
+  border-radius: 12px;
+}
+.range-label { font-size: 13px; color: var(--text-dim); font-weight: 600; }
+.range-tip { font-size: 12px; color: var(--text-sub); }
+.range-tip.loading { color: #b48a00; }
+.range-bar.loading .seg button { pointer-events: none; opacity: .6; }
+
 /* ---------------------------------------------------------------- 牛熊统计 */
 .stat-row {
   display: grid;
