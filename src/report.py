@@ -6,7 +6,7 @@ from typing import Callable, Dict, Optional
 
 from config import DEFAULT_CODE, SWING_THRESHOLDS
 from src import cache, indicators
-from src.fetcher import FetchError, fetch_daily_bars, normalize_code
+from src.fetcher import FetchError, fetch_daily_bars, resolve_code
 
 
 def load_bars(
@@ -66,7 +66,7 @@ def get_payload(
     since: Optional[str] = None,
     logger: Optional[Callable[[str], None]] = None,
 ) -> Dict:
-    code = normalize_code(code_raw)
+    code = resolve_code(code_raw)
     bundle = load_bars(code, refresh=refresh, logger=logger)
     bars = bundle["bars"]
     if not bars:

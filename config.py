@@ -8,6 +8,12 @@ DB_PATH = DATA_DIR / "cache.db"
 
 # ---------------------------------------------------------------- 数据源
 TENCENT_KLINE_URL = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+# 轻量实时行情接口，仅用于判定某代码是否存在及其证券名称（解决 000xxx 市场歧义）
+TENCENT_QUOTE_URL = "https://qt.gtimg.cn/q="
+# 备用K线接口：与主接口后复权数据已逐日比对完全一致，主接口被 WAF 拦截时自动切换
+TENCENT_KLINE_FALLBACK_URL = "https://web.ifzq.gtimg.cn/appstock/app/newfqkline/get"
+# 主接口连续失败达到该次数后即切备用接口（WAF 拦截通常持续，不宜久等）
+PRIMARY_ATTEMPTS = 2
 TENCENT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -34,6 +40,7 @@ DEFAULT_CODE = "sh510500"
 CODE_PRESETS = [
     ("sh510500", "中证500ETF 南方"),
     ("sh000905", "中证500 指数"),
+    ("sh000510", "中证A500 指数"),
     ("sh510300", "沪深300ETF 华泰柏瑞"),
     ("sh000300", "沪深300 指数"),
     ("sz159915", "创业板ETF 易方达"),

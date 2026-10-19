@@ -23,17 +23,20 @@ from config import (
     EARLIEST_DATE,
     MAX_RETRIES,
     PAGE_SIZE,
+    PRIMARY_ATTEMPTS,
     SEGMENT_YEARS,
     TENCENT_HEADERS,
+    TENCENT_KLINE_FALLBACK_URL,
     TENCENT_KLINE_URL,
+    TENCENT_QUOTE_URL,
 )
 
-# 6 位代码中以 000 开头但属于「中证/上证指数」的白名单（其余 000xxx 视为深市股票）
-_SH_INDEX_PREFIX = {
-    "000001", "000016", "000300", "000688", "000852", "000905",
-    "000906", "000922", "000985", "000991", "000992", "000993",
-}
-_SH_INDEX_CODE = {"000009", "000010", "000011", "000012", "000013"}
+# 000xxx 是「中证/上证指数」与「深市主板股票」的重叠区段，同一数字两者可并存：
+#   000001 -> 上证指数 sh000001 / 平安银行 sz000001
+#   000510 -> 中证A500 sh000510 / 新金路  sz000510
+# 纯规则与固定白名单都无法覆盖（新指数会不断发布），故改为探测：
+# sh 下存在该证券则按沪市指数解释，否则按深市股票解释。探测结果按代码缓存。
+_MARKET_CACHE: Dict[str, str] = {}
 
 
 class FetchError(RuntimeError):
@@ -61,12 +64,67 @@ def normalize_code(raw: str) -> str:
     if digits.startswith(("6", "5", "9")):
         return "sh" + digits
     if digits.startswith("000"):
-        # 000xxx 既有深市股票（平安银行 000001 与上证指数同名），
-        # 命中白名单按沪市指数处理，其余按深市股票处理
-        return ("sh" if digits in _SH_INDEX_PREFIX | _SH_INDEX_CODE else "sz") + digits
+        # 000xxx 为指数/深市股票重叠区，纯规则默认按中证指数（本工具主场景），
+        # 精确判定交给 resolve_code() 的市场探测。
+        return "sh" + digits
     if digits.startswith(("3", "1", "2", "0")):
         return "sz" + digits
     return "sh" + digits
+
+
+def lookup_name(code: str) -> Optional[str]:
+    """取证券名称。
+
+    返回：证券名称 / ""（该代码确实不存在）/ None（网络或 WAF 导致无法确定）。
+    """
+    for attempt in range(3):
+        try:
+            resp = requests.get(
+                TENCENT_QUOTE_URL + code, headers=TENCENT_HEADERS, timeout=8
+            )
+            resp.encoding = "gbk"
+            text = (resp.text or "").strip()
+        except Exception:  # noqa: BLE001
+            time.sleep(0.8 * (attempt + 1))
+            continue
+        if not text.startswith("v_"):
+            time.sleep(0.8 * (attempt + 1))  # 大概率被 WAF 拦截，退避重试
+            continue
+        body = text.split('"')[1] if '"' in text else ""
+        if not body:
+            return ""  # 该代码不存在
+        parts = body.split("~")
+        return parts[1] if len(parts) > 1 and parts[1] else ""
+    return None
+
+
+def _resolve_000_market(digits: str) -> str:
+    """判定 000xxx 归属沪市指数还是深市股票，结果按代码缓存，避免重复探测。"""
+    cached = _MARKET_CACHE.get(digits)
+    if cached:
+        return cached
+    market = "sh"  # 探测不出结果时按指数兜底
+    for _ in range(3):
+        name = lookup_name("sh" + digits)
+        if name is None:
+            continue  # lookup_name 内部已退避重试
+        market = "sh" if name else "sz"
+        break
+    _MARKET_CACHE[digits] = market
+    return market
+
+
+def resolve_code(raw: str) -> str:
+    """规范化代码，并对 000xxx 重叠区做市场探测。
+
+    用户显式带 sh/sz 前缀时完全尊重输入，不做探测。
+    """
+    cleaned = (raw or "").strip().lower().replace(" ", "")
+    explicit = cleaned.startswith(("sh", "sz"))
+    code = normalize_code(cleaned)
+    if explicit or not code[2:].startswith("000"):
+        return code
+    return _resolve_000_market(code[2:]) + code[2:]
 
 
 def _iter_segments(start_year: int, end_year: int) -> List[Tuple[str, str]]:
@@ -81,28 +139,35 @@ def _iter_segments(start_year: int, end_year: int) -> List[Tuple[str, str]]:
 
 
 def _request_segment(session: requests.Session, code: str, start: str, end: str) -> Optional[dict]:
-    """请求单个区间，带 WAF 重试。返回 data[code] 字典；空段返回 None。"""
+    """请求单个区间，带 WAF 重试；主接口受挫时自动切备用接口。
+
+    两个接口的后复权数据已逐日比对一致，可互为备份，避免单一接口被
+    腾讯 WAF 拦截时整个查询失败。
+    """
     param = f"{code},day,{start},{end},{PAGE_SIZE},hfq"
-    url = f"{TENCENT_KLINE_URL}?param={param}"
     last_err = ""
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = session.get(url, headers=TENCENT_HEADERS, timeout=20)
-            text = resp.text
-            if not text.lstrip().startswith("{"):
-                # 命中了腾讯 WAF 拦截页
-                last_err = "WAF拦截"
+    for idx, base in enumerate((TENCENT_KLINE_URL, TENCENT_KLINE_FALLBACK_URL)):
+        tries = PRIMARY_ATTEMPTS if idx == 0 else MAX_RETRIES
+        url = f"{base}?param={param}"
+        for attempt in range(tries):
+            try:
+                resp = session.get(url, headers=TENCENT_HEADERS, timeout=20)
+                text = resp.text
+                if not text.lstrip().startswith("{"):
+                    # 命中了腾讯 WAF 拦截页
+                    last_err = "WAF拦截"
+                    time.sleep(0.8 * (attempt + 1))
+                    continue
+                payload = resp.json()
+                if payload.get("code") != 0:
+                    last_err = f"接口返回 code={payload.get('code')} {payload.get('msg')}"
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                return payload.get("data", {}).get(code) or {}
+            except Exception as exc:  # noqa: BLE001 - 网络异常统一重试
+                last_err = f"{type(exc).__name__}: {exc}"
                 time.sleep(0.8 * (attempt + 1))
-                continue
-            payload = resp.json()
-            if payload.get("code") != 0:
-                last_err = f"接口返回 code={payload.get('code')} {payload.get('msg')}"
-                time.sleep(0.5 * (attempt + 1))
-                continue
-            return payload.get("data", {}).get(code) or {}
-        except Exception as exc:  # noqa: BLE001 - 网络异常统一重试
-            last_err = f"{type(exc).__name__}: {exc}"
-            time.sleep(0.8 * (attempt + 1))
+        # 主接口重试耗尽，换备用接口继续
     raise FetchError(f"抓取 {code} {start}~{end} 失败：{last_err}")
 
 

@@ -25,7 +25,7 @@ from config import (
     SWING_THRESHOLDS,
 )
 from src import cache
-from src.fetcher import FetchError, normalize_code
+from src.fetcher import FetchError, resolve_code
 from src.report import get_payload
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -53,7 +53,7 @@ def _render(request: Request, code: str, refresh: bool, since: str | None):
     payload = None
     error = None
     try:
-        code = normalize_code(code)
+        code = resolve_code(code)
         display_code = code
         payload = get_payload(code, refresh=refresh, since=since, logger=logger.info)
     except (FetchError, ValueError) as exc:
@@ -97,7 +97,7 @@ def index(
 def api_refresh(code: str = Query(DEFAULT_CODE)):
     """强制清缓存并重新抓取，返回最新元信息。"""
     try:
-        normalized = normalize_code(code)
+        normalized = resolve_code(code)
         cache.clear(normalized)
         payload = get_payload(normalized, refresh=True, logger=logger.info)
         return JSONResponse({"ok": True, "meta": payload["meta"]})
