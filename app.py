@@ -36,6 +36,28 @@ logger = logging.getLogger("stock-cycle")
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATE_DIR = BASE_DIR / "templates"
 
+
+def _static_ver(filename: str) -> str:
+    """计算静态资源的短哈希，用于 cache-busting（文件内容变化则版本号变化）。
+
+    发布后浏览器会据此强制重新拉取最新 JS/CSS，避免旧缓存导致交互失效。
+    """
+    import hashlib
+
+    p = STATIC_DIR / filename
+    try:
+        h = hashlib.sha256(p.read_bytes()).hexdigest()
+        return h[:12]
+    except OSError:
+        return "0"
+
+
+STATIC_VER = {
+    "css": _static_ver("css/style.css"),
+    "echarts": _static_ver("js/echarts.min.js"),
+    "app": _static_ver("js/app.js"),
+}
+
 app = FastAPI(title="长期走势 · 回撤 · 牛熊周期分析", docs_url="/docs")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -77,6 +99,7 @@ def _render(request: Request, code: str, refresh: bool, since: str | None, defau
             "default_threshold": DEFAULT_THRESHOLD,
             "default_range": default_range,
             "view_ranges": VIEW_RANGES,
+            "static_ver": STATIC_VER,
             "since": since or "",
             "title": (
                 f"{_short_code(display_code)}（对数）走势、回撤与牛熊周期"

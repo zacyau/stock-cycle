@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light">
 <title>{{ title }}</title>
-<link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/style.css?v={{ static_ver.css }}">
 </head>
 <body>
 <div class="page">
@@ -133,12 +133,12 @@
   </footer>
 </div>
 
-<script src="/static/js/echarts.min.js"></script>
+<script src="/static/js/echarts.min.js?v={{ static_ver.echarts }}"></script>
 {% if payload %}
 <script>window.__DATA__ = {{ payload | tojson }};</script>
 {% else %}
 <script>window.__DATA__ = null;</script>
 {% endif %}
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v={{ static_ver.app }}"></script>
 </body>
 </html>
